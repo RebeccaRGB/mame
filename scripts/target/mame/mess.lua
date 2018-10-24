@@ -618,6 +618,7 @@ MACHINES["WD11C00_17"] = true
 MACHINES["WD2010"] = true
 MACHINES["WD33C93"] = true
 MACHINES["WD7600"] = true
+MACHINES["X2201"] = true
 MACHINES["X2212"] = true
 MACHINES["X76F041"] = true
 MACHINES["X76F100"] = true
@@ -670,6 +671,7 @@ MACHINES["IOPDMA"] = true
 MACHINES["IOPINTC"] = true
 MACHINES["IOPSIO2"] = true
 MACHINES["IOPTIMER"] = true
+MACHINES["Z8038"] = true
 
 --------------------------------------------------
 -- specify available bus cores
@@ -1088,6 +1090,7 @@ function linkProjects_mame_mess(_target, _subtarget)
 		"mgu",
 		"microkey",
 		"microsoft",
+		"mips",
 		"mit",
 		"mits",
 		"mitsubishi",
@@ -2233,6 +2236,8 @@ files {
 	MAME_DIR .. "src/mame/machine/hp48.cpp",
 	MAME_DIR .. "src/mame/machine/hp48_port.cpp",
 	MAME_DIR .. "src/mame/machine/hp48_port.h",
+	MAME_DIR .. "src/mame/machine/hp9825_tape.cpp",
+	MAME_DIR .. "src/mame/machine/hp9825_tape.h",
 	MAME_DIR .. "src/mame/machine/hp9845_printer.cpp",
 	MAME_DIR .. "src/mame/machine/hp9845_printer.h",
 	MAME_DIR .. "src/mame/video/hp48.cpp",
@@ -2484,6 +2489,12 @@ files {
 	MAME_DIR .. "src/mame/includes/xbox.h",
 	MAME_DIR .. "src/mame/includes/xbox_usb.h",
 	MAME_DIR .. "src/mame/includes/xbox_pci.h",
+}
+
+createMESSProjects(_target, _subtarget, "mips")
+files {
+	MAME_DIR .. "src/mame/drivers/mips.cpp",
+	MAME_DIR .. "src/mame/includes/mips.h",
 }
 
 createMESSProjects(_target, _subtarget, "mit")
@@ -3724,6 +3735,9 @@ files {
 	MAME_DIR .. "src/mame/drivers/imsai.cpp",
 	MAME_DIR .. "src/mame/drivers/indiana.cpp",
 	MAME_DIR .. "src/mame/drivers/is48x.cpp",
+	MAME_DIR .. "src/mame/drivers/itt1700.cpp",
+	MAME_DIR .. "src/mame/machine/itt1700_kbd.cpp",
+	MAME_DIR .. "src/mame/machine/itt1700_kbd.h",
 	MAME_DIR .. "src/mame/drivers/itt3030.cpp",
 	MAME_DIR .. "src/mame/drivers/jade.cpp",
 	MAME_DIR .. "src/mame/drivers/jonos.cpp",
@@ -3801,6 +3815,7 @@ files {
 	MAME_DIR .. "src/mame/drivers/sh4robot.cpp",
 	MAME_DIR .. "src/mame/drivers/sansa_fuze.cpp",
 	MAME_DIR .. "src/mame/drivers/scopus.cpp",
+	MAME_DIR .. "src/mame/drivers/si5500.cpp",
 	MAME_DIR .. "src/mame/drivers/softbox.cpp",
 	MAME_DIR .. "src/mame/includes/softbox.h",
 	MAME_DIR .. "src/mame/drivers/squale.cpp",

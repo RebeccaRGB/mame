@@ -336,6 +336,7 @@ isbc.cpp
 isbc8010.cpp
 isbc8030.cpp
 iskr103x.cpp
+itt1700.cpp
 itt3030.cpp
 jade.cpp
 jazz.cpp
@@ -425,6 +426,7 @@ minicom.cpp
 miniforce.cpp
 miniframe.cpp
 minitel_2_rpic.cpp
+mips.cpp
 mits680b.cpp
 mk1.cpp
 mk14.cpp
@@ -649,6 +651,7 @@ segapm.cpp
 selz80.cpp
 sg1000.cpp
 sh4robot.cpp
+si5500.cpp
 sitcom.cpp
 sk1.cpp
 slc1.cpp

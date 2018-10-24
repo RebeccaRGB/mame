@@ -2961,6 +2961,18 @@ end
 
 ---------------------------------------------------
 --
+--@src/devices/machine/x2201.h,MACHINES["X2201"] = true
+---------------------------------------------------
+
+if (MACHINES["X2201"]~=null) then
+	files {
+		MAME_DIR .. "src/devices/machine/x2201.cpp",
+		MAME_DIR .. "src/devices/machine/x2201.h",
+	}
+end
+
+---------------------------------------------------
+--
 --@src/devices/machine/x2212.h,MACHINES["X2212"] = true
 ---------------------------------------------------
 
@@ -3781,5 +3793,17 @@ if (MACHINES["SUN4C_MMU"]~=null) then
 	files {
 		MAME_DIR .. "src/devices/machine/sun4c_mmu.cpp",
 		MAME_DIR .. "src/devices/machine/sun4c_mmu.h",
+	}
+end
+
+---------------------------------------------------
+--
+--@src/devices/machine/z8038.h,MACHINES["Z8038"] = true
+---------------------------------------------------
+
+if (MACHINES["Z8038"]~=null) then
+	files {
+		MAME_DIR .. "src/devices/machine/z8038.cpp",
+		MAME_DIR .. "src/devices/machine/z8038.h",
 	}
 end

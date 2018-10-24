@@ -41,6 +41,11 @@ void human_interface_device::device_add_mconfig(machine_config &config)
 	keyboard.set_default_option("hp_46021a");
 	keyboard.set_hp_hil_slot(this, "mlc");
 
+	hp_hil_slot_device &mouse(HP_HIL_SLOT(config, "hil2", 0));
+	hp_hil_devices(mouse);
+	mouse.set_default_option("hp_46060b");
+	mouse.set_hp_hil_slot(this, "mlc");
+
 	SPEAKER(config, "mono").front_center();
 	sn76494_device &sound(SN76494(config, "sn76494", 333333));
 	sound.add_route(ALL_OUTPUTS, "mono", 0.75);
@@ -75,6 +80,7 @@ void human_interface_device::device_add_mconfig(machine_config &config)
 	ieee488.srq_callback().set(m_tms9914, FUNC(tms9914_device::srq_w));
 	ieee488.atn_callback().set(m_tms9914, FUNC(tms9914_device::atn_w));
 	ieee488.ren_callback().set(m_tms9914, FUNC(tms9914_device::ren_w));
+	ieee488.dio_callback().set(FUNC(human_interface_device::ieee488_dio_w));
 
 	ieee488_slot_device &slot0(IEEE488_SLOT(config, "ieee0", 0));
 	hp_ieee488_devices(slot0);
@@ -95,12 +101,6 @@ void human_interface_device::iocpu_map(address_map& map)
 {
 	map(0x0000, 0x07ff).rom().region("iocpu", 0);
 }
-void human_interface_device::map(address_map& map)
-{
-	map(0x00420000, 0x00420003).mirror(0x0000fffc).rw(m_iocpu, FUNC(upi41_cpu_device::upi41_master_r), FUNC(upi41_cpu_device::upi41_master_w)).umask32(0x00ff00ff);
-	map(0x00470000, 0x0047001f).mirror(0x0000ffe0).rw(FUNC(human_interface_device::gpib_r), FUNC(human_interface_device::gpib_w)).umask16(0x00ff);
-
-}
 
 human_interface_device::human_interface_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
 	human_interface_device(mconfig, HPDIO_HUMAN_INTERFACE, tag, owner, clock)
@@ -114,7 +114,8 @@ human_interface_device::human_interface_device(const machine_config &mconfig, de
 	m_mlc(*this, "mlc"),
 	m_sound(*this, "sn76494"),
 	m_tms9914(*this, "tms9914"),
-	m_rtc(*this, "rtc")
+	m_rtc(*this, "rtc"),
+	m_ieee488(*this, IEEE488_TAG)
 {
 }
 
@@ -130,15 +131,20 @@ void human_interface_device::device_start()
 
 	save_item(NAME(m_hil_read));
 	save_item(NAME(m_kbd_nmi));
-	save_item(NAME(gpib_irq_line));
+	save_item(NAME(m_gpib_irq_line));
 	save_item(NAME(m_old_latch_enable));
 	save_item(NAME(m_hil_data));
 	save_item(NAME(m_latch_data));
 	save_item(NAME(m_rtc_data));
+	save_item(NAME(m_ppoll_mask));
+	save_item(NAME(m_ppoll_sc));
 }
 
 void human_interface_device::device_reset()
 {
+	m_ppoll_sc = 0;
+	m_gpib_irq_line = false;
+	m_kbd_nmi = false;
 	m_rtc->cs1_w(ASSERT_LINE);
 	m_rtc->cs2_w(CLEAR_LINE);
 	m_rtc->write_w(CLEAR_LINE);
@@ -152,10 +158,16 @@ WRITE_LINE_MEMBER(human_interface_device::reset_in)
 	if (state)
 		device_reset();
 }
+
+void human_interface_device::update_gpib_irq()
+{
+	irq3_out((m_gpib_irq_line || (m_ppoll_sc & PPOLL_IR)) ? ASSERT_LINE : CLEAR_LINE);
+}
+
 WRITE_LINE_MEMBER(human_interface_device::gpib_irq)
 {
-	gpib_irq_line = state;
-	irq3_out(state ? ASSERT_LINE : CLEAR_LINE);
+	m_gpib_irq_line = state;
+	update_gpib_irq();
 }
 
 WRITE_LINE_MEMBER(human_interface_device::gpib_dreq)
@@ -163,11 +175,46 @@ WRITE_LINE_MEMBER(human_interface_device::gpib_dreq)
 	dmar0_out(state);
 }
 
+WRITE8_MEMBER(human_interface_device::ieee488_dio_w)
+{
+	if ((m_ppoll_mask & ~data) && (m_ppoll_sc & PPOLL_IE)) {
+		LOG("%s: PPOLL triggered\n");
+		m_ieee488->host_atn_w(1);
+		m_ieee488->host_eoi_w(1);
+		m_ppoll_sc |= PPOLL_IR;
+		update_gpib_irq();
+	}
+}
+
 WRITE8_MEMBER(human_interface_device::gpib_w)
 {
 	if (offset & 0x08) {
 		m_tms9914->reg8_w(space, offset & 0x07, data);
 		return;
+	}
+
+	switch (offset) {
+	case 0:
+		device_reset();
+		break;
+
+	case 3:
+		m_ppoll_sc = data & PPOLL_IE;
+
+		if (!(data & PPOLL_IR)) {
+			m_ppoll_sc &= ~PPOLL_IR;
+			update_gpib_irq();
+		}
+
+		if (m_ppoll_sc & PPOLL_IE) {
+			LOG("%s: start parallel poll\n", __func__);
+			m_ieee488->host_atn_w(0);
+			m_ieee488->host_eoi_w(0);
+		}
+		break;
+	case 4:
+		m_ppoll_mask = data;
+		break;
 	}
 	LOG("gpib_w: %s %02X = %02X\n", machine().describe_context().c_str(), offset, data);
 }
@@ -187,13 +234,21 @@ READ8_MEMBER(human_interface_device::gpib_r)
 		break;
 	case 1:
 		/* Int control */
-		data = 0x80 | (gpib_irq_line ? 0x40 : 0);
+		data = 0x80 | (m_gpib_irq_line ? 0x40 : 0);
 		break;
 	case 2:
 		/* Address */
 		data = (m_tms9914->cont_r() ? 0x0 : 0x40) | 0x81;
 		if (m_kbd_nmi)
 			data |= 0x04;
+		break;
+	case 3:
+		/* Parallel poll status/control */
+		data = m_ppoll_sc;
+		break;
+	case 4:
+		/* Parallel poll mask */
+		data = m_ppoll_mask;
 		break;
 	}
 	LOG("gpib_r: %s %02X = %02X\n", machine().describe_context().c_str(), offset, data);
@@ -295,8 +350,7 @@ void human_interface_device::dmack_w_in(int channel, uint8_t data)
 {
 	if (channel)
 		return;
-//	FIXME
-//	m_tms9914->reg8_w(memory_space(), 7, data);
+	m_tms9914->reg8_w(*program_space(), 7, data);
 }
 
 uint8_t human_interface_device::dmack_r_in(int channel)
